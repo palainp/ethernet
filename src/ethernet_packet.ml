@@ -37,15 +37,16 @@ let equal {source; destination; ethertype} q =
 
 module Unmarshal = struct
 
-  let of_cstruct frame =
-    if Cstruct.length frame >= sizeof_ethernet then
-      let raw_typ = Cstruct.BE.get_uint16 frame 12 in
+  let of_bytes frame =
+    if Bytes.length frame >= sizeof_ethernet then
+      let raw_typ = Bytes.get_uint16_be frame 12 in
       match raw_typ |> int_to_ethertype with
       | None -> Error (Printf.sprintf "unknown ethertype 0x%x in frame" raw_typ)
       | Some ethertype ->
-        let payload = Cstruct.shift frame sizeof_ethernet
-        and source = Macaddr.of_octets_exn (Cstruct.to_string ~off:6 ~len:6 frame)
-        and destination = Macaddr.of_octets_exn (Cstruct.to_string ~off:0 ~len:6 frame)
+        let frlen = Bytes.length frame in
+        let payload = Bytes.sub frame sizeof_ethernet (frlen - sizeof_ethernet)
+        and source = Macaddr.of_octets_exn (Bytes.sub_string frame 6 6)
+        and destination = Macaddr.of_octets_exn (Bytes.sub_string frame 0 6)
         in
         Ok ({ destination; source; ethertype;}, payload)
     else
@@ -54,20 +55,20 @@ end
 
 module Marshal = struct
   let check_len buf =
-    if sizeof_ethernet > Cstruct.length buf then
+    if sizeof_ethernet > Bytes.length buf then
       Error "Not enough space for an Ethernet header"
     else Ok ()
 
   let unsafe_fill t buf =
-    Cstruct.blit_from_string (Macaddr.to_octets t.destination) 0 buf 0 6;
-    Cstruct.blit_from_string (Macaddr.to_octets t.source) 0 buf 6 6;
-    Cstruct.BE.set_uint16 buf 12 (ethertype_to_int t.ethertype)
+    Bytes.blit_string (Macaddr.to_octets t.destination) 0 buf 0 6;
+    Bytes.blit_string (Macaddr.to_octets t.source) 0 buf 6 6;
+    Bytes.set_uint16_be buf 12 (ethertype_to_int t.ethertype)
 
-  let into_cstruct t buf =
+  let into_bytes t buf =
     Result.map (fun () -> unsafe_fill t buf) (check_len buf)
 
-  let make_cstruct t =
-    let buf = Cstruct.create sizeof_ethernet in
+  let make_bytes t =
+    let buf = Bytes.create sizeof_ethernet in
     unsafe_fill t buf;
     buf
 end

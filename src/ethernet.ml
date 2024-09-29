@@ -29,11 +29,11 @@ module Packet = struct
 
   let sizeof_ethernet = Ethernet_packet.sizeof_ethernet
 
-  let of_cstruct = Ethernet_packet.Unmarshal.of_cstruct
+  let of_bytes = Ethernet_packet.Unmarshal.of_bytes
 
-  let into_cstruct = Ethernet_packet.Marshal.into_cstruct
+  let into_bytes = Ethernet_packet.Marshal.into_bytes
 
-  let make_cstruct = Ethernet_packet.Marshal.make_cstruct
+  let make_bytes = Ethernet_packet.Marshal.make_bytes
 end
 
 module type S = sig
@@ -42,14 +42,14 @@ module type S = sig
   type t
   val disconnect : t -> unit Lwt.t
   val write: t -> ?src:Macaddr.t -> Macaddr.t -> Packet.proto -> ?size:int ->
-    (Cstruct.t -> int) -> (unit, error) result Lwt.t
+    (Bytes.t -> int) -> (unit, error) result Lwt.t
   val mac: t -> Macaddr.t
   val mtu: t -> int
   val input:
-    arpv4:(Cstruct.t -> unit Lwt.t) ->
-    ipv4:(Cstruct.t -> unit Lwt.t) ->
-    ipv6:(Cstruct.t -> unit Lwt.t) ->
-    t -> Cstruct.t -> unit Lwt.t
+    arpv4:(Bytes.t -> unit Lwt.t) ->
+    ipv4:(Bytes.t -> unit Lwt.t) ->
+    ipv6:(Bytes.t -> unit Lwt.t) ->
+    t -> Bytes.t -> unit Lwt.t
 end
 
 open Lwt.Infix
@@ -76,7 +76,7 @@ module Make (Netif : Mirage_net.S) = struct
     let of_interest dest =
       Macaddr.compare dest (mac t) = 0 || not (Macaddr.is_unicast dest)
     in
-    match Unmarshal.of_cstruct frame with
+    match Unmarshal.of_bytes frame with
     | Ok (header, payload) when of_interest header.destination ->
       begin
         match header.Ethernet_packet.ethertype with
@@ -104,12 +104,14 @@ module Make (Netif : Mirage_net.S) = struct
       let size = eth_hdr_size + size in
       let hdr = { Ethernet_packet.source ; destination ; ethertype } in
       let fill frame =
-        match Ethernet_packet.Marshal.into_cstruct hdr frame with
+        match Ethernet_packet.Marshal.into_bytes hdr frame with
         | Error msg ->
           Log.err (fun m -> m "error %s while marshalling ethernet header into allocated buffer" msg);
           0
         | Ok () ->
-          let len = payload (Cstruct.shift frame eth_hdr_size) in
+          let frlen = Bytes.length frame in
+          let buf = Bytes.sub frame eth_hdr_size (frlen - eth_hdr_size) in
+          let len = payload buf in
           eth_hdr_size + len
       in
       Netif.write t.netif ~size fill >|= function

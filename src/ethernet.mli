@@ -1,4 +1,4 @@
-(*
+C(*
  * Copyright (c) 2010-2019 Anil Madhavapeddy <anil@recoil.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -43,19 +43,19 @@ module Packet : sig
   (** [sizeof_ethernet] is the byte size of the ethernet header. *)
   val sizeof_ethernet : int
 
-  (** [of_cstruct buffer] attempts to decode the buffer as ethernet packet. It
+  (** [of_bytes buffer] attempts to decode the buffer as ethernet packet. It
       may result an error if the buffer is too small, or the protocol is not
       supported. *)
-  val of_cstruct : Cstruct.t -> (t * Cstruct.t, string) result
+  val of_bytes : Bytes.t -> (t * Bytes.t, string) result
 
-  (** [into_cstruct t cs] attempts to encode the ethernet packet [t] into the
+  (** [into_bytes t cs] attempts to encode the ethernet packet [t] into the
       buffer [cs] (at offset 0). This may fail if the buffer is not big
       enough. *)
-  val into_cstruct : t -> Cstruct.t -> (unit, string) result
+  val into_bytes : t -> Bytes.t -> (unit, string) result
 
-  (** [make_cstruct t] encodes the ethernet packet [t] into a freshly allocated
+  (** [make_bytes t] encodes the ethernet packet [t] into a freshly allocated
       buffer. *)
-  val make_cstruct : t -> Cstruct.t
+  val make_bytes : t -> Bytes.t
 end
 
 module type S = sig
@@ -74,7 +74,7 @@ module type S = sig
       complete, it can never result in an error. *)
 
   val write: t -> ?src:Macaddr.t -> Macaddr.t -> Packet.proto -> ?size:int ->
-    (Cstruct.t -> int) -> (unit, error) result Lwt.t
+    (Bytes.t -> int) -> (unit, error) result Lwt.t
   (** [write eth ~src dst proto ~size payload] outputs an ethernet frame which
      header is filled by [eth], and its payload is the buffer from the call to
      [payload]. [Payload] gets a buffer of [size] (defaults to mtu) to fill with
@@ -88,10 +88,10 @@ module type S = sig
       size of the payload, excluding the ethernet frame header. *)
 
   val input:
-    arpv4:(Cstruct.t -> unit Lwt.t) ->
-    ipv4:(Cstruct.t -> unit Lwt.t) ->
-    ipv6:(Cstruct.t -> unit Lwt.t) ->
-    t -> Cstruct.t -> unit Lwt.t
+    arpv4:(Bytes.t -> unit Lwt.t) ->
+    ipv4:(Bytes.t -> unit Lwt.t) ->
+    ipv6:(Bytes.t -> unit Lwt.t) ->
+    t -> Bytes.t -> unit Lwt.t
   (** [input ~arpv4 ~ipv4 ~ipv6 eth buffer] decodes the buffer and demultiplexes
       it depending on the protocol to the callback. *)
 end
