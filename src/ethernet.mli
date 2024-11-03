@@ -1,4 +1,4 @@
-C(*
+(*
  * Copyright (c) 2010-2019 Anil Madhavapeddy <anil@recoil.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
